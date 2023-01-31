@@ -1,15 +1,25 @@
 #include <malloc.h>
+#include <memory.h>
 #include "tiny_pool.h"
 
 pool_t* tiny_pool_create(uint32_t size) {
 
+    printf("create thread pool size -> %d\n", size);
+
     pool_t *pool = (pool_t*)malloc(sizeof(pool_t));
 
-    for (int i = 0; i < 8; ++i) {
-        pool->threads[i] = 0;
-    }
+//    for (int i = 0; i < 8; ++i) {
+//        pool->threads[i] = 0;
+//    }
+
+    pool->thread_num = size;
+    pool->threads = (pthread_t*)malloc(sizeof(pthread_t) * size);
+    memset(pool->threads, 0, sizeof(pthread_t) * size);
 
     pool->status = PREPARING;
+    pthread_mutex_init(&pool->status_changing, NULL);
+
+    pool->busy_thread_num = 0;
     pthread_mutex_init(&pool->busy_thread_num_mutex, NULL);
 
     pool->task_queue_front = NULL;
@@ -45,10 +55,11 @@ void task_queue_push(pool_t *pool, task_t *task) {
 
     ++pool->task_queue_size;
 
+    printf("push success -> size = %d\n", pool->task_queue_size);
+
     // TODO: unlock task queue
     pthread_mutex_unlock(&pool->task_queue_busy);
 
-    printf("push success\n");
 
     if (pool->status == RUNNING) {
 
@@ -108,10 +119,13 @@ task_t* task_queue_pop(pool_t *pool) {
 
     }
 
+    --pool->task_queue_size;
+
+    printf("pop success -> size = %d\n", pool->task_queue_size);
+
     // TODO: unlock task queue
     pthread_mutex_unlock(&pool->task_queue_busy);
 
-    printf("pop success\n");
 
     return front;
 
@@ -160,7 +174,7 @@ void tiny_pool_boot(pool_t *pool) {
 
     pthread_mutex_lock(&pool->task_queue_busy);
 
-    for (uint32_t i = 0; i < 8; ++i) {
+    for (uint32_t i = 0; i < pool->thread_num; ++i) {
 
         printf("start thread %d\n", i);
 
@@ -170,9 +184,23 @@ void tiny_pool_boot(pool_t *pool) {
 
     printf("thread boot complete\n");
 
+    pthread_mutex_lock(&pool->status_changing);
     pool->status = RUNNING;
+    pthread_mutex_unlock(&pool->status_changing);
 
     pthread_mutex_unlock(&pool->task_queue_busy);
+
+}
+
+void tiny_pool_kill(pool_t *pool) {
+
+    printf("pool enter EXITING status\n");
+
+    pthread_mutex_lock(&pool->status_changing);
+
+    pool->status = EXITING;
+
+    pthread_mutex_unlock(&pool->status_changing);
 
 }
 

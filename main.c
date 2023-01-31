@@ -19,9 +19,9 @@ int main() {
 
 //    pthread_t tid;
 
-    pool_t *pool = tiny_pool_create(0);
+    pool_t *pool = tiny_pool_create(2);
 
-    int dat[] = {1, 2, 3, 4, 5, 6};
+    int dat[] = {1, 2, 3, 4, 5, 6, 7, 8};
     tiny_pool_submit(pool, demo_fun, (void*)&dat[0]);
     tiny_pool_submit(pool, demo_fun, (void*)&dat[1]);
 
@@ -37,10 +37,18 @@ int main() {
     tiny_pool_submit(pool, demo_fun, (void*)&dat[3]);
     tiny_pool_submit(pool, demo_fun, (void*)&dat[4]);
 
+    sleep(8);
+
     // TODO: tiny pool join
-    sleep(15);
+
+    printf("pool try exit\n");
+    tiny_pool_kill(pool);
 
     // TODO: tiny pool destroy
+
+    sleep(20);
+
+    printf("main exit\n");
 
     return 0;
 }
