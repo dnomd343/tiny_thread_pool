@@ -4,16 +4,26 @@
 
 pool_t* tiny_pool_create(uint32_t size) {
 
+    // TODO: return NULL when error
+
     printf("create thread pool size -> %d\n", size);
 
     pool_t *pool = (pool_t*)malloc(sizeof(pool_t));
 
-//    for (int i = 0; i < 8; ++i) {
-//        pool->threads[i] = 0;
-//    }
+    if (pool == NULL) {
+        return NULL;
+    }
 
     pool->thread_num = size;
     pool->threads = (pthread_t*)malloc(sizeof(pthread_t) * size);
+
+    if (pool->threads == NULL) {
+
+        free(pool);
+
+        return NULL;
+    }
+
     memset(pool->threads, 0, sizeof(pthread_t) * size);
 
     pool->status = PREPARING;
@@ -27,7 +37,7 @@ pool_t* tiny_pool_create(uint32_t size) {
     pool->task_queue_size = 0;
     pthread_mutex_init(&pool->task_queue_busy, NULL);
 
-//    pthread_cond_init(&pool->task_queue_empty, NULL);
+    pthread_cond_init(&pool->task_queue_empty, NULL);
     pthread_cond_init(&pool->task_queue_not_empty, NULL);
 
     return pool;
@@ -65,17 +75,25 @@ void task_queue_push(pool_t *pool, task_t *task) {
 
         // TODO: send cond signal
 
-        printf("send signal -> queue not empty\n");
+//        printf("send signal -> queue not empty\n");
+//        pthread_cond_signal(&pool->task_queue_not_empty);
 
-        pthread_cond_signal(&pool->task_queue_not_empty);
+        printf("send broadcast -> queue not empty\n");
+        pthread_cond_broadcast(&pool->task_queue_not_empty);
 
     }
-
 
 }
 
 void tiny_pool_submit(pool_t *pool, void (*func)(void*), void *arg) {
 
+    // check status -> failed
+    if (pool->status == EXITING) {
+        return;
+        // TODO: return false here
+    }
+
+    // TODO: malloc error -> return bool false
     task_t *new_task = (task_t*)malloc(sizeof(task_t));
 
     new_task->func = func;
@@ -84,6 +102,10 @@ void tiny_pool_submit(pool_t *pool, void (*func)(void*), void *arg) {
 
     // TODO: new task push into task queue
     task_queue_push(pool, new_task);
+
+    // TODO: queue push may failed -> return false
+
+    // TODO: return bool true
 
 }
 
@@ -101,9 +123,11 @@ task_t* task_queue_pop(pool_t *pool) {
         // TODO: wait new task added
         pthread_cond_wait(&pool->task_queue_not_empty, &pool->task_queue_busy);
 
+        printf("pop exit wait\n");
+
     }
 
-    printf("pop exit wait\n");
+    printf("pop exit loop\n");
 
     task_t *front = pool->task_queue_front;
 
@@ -112,6 +136,9 @@ task_t* task_queue_pop(pool_t *pool) {
         // queue is empty now
         pool->task_queue_front = NULL;
         pool->task_queue_rear = NULL;
+
+        /// will it cause dead lock?
+        pthread_cond_signal(&pool->task_queue_empty);
 
     } else {
 
@@ -192,15 +219,34 @@ void tiny_pool_boot(pool_t *pool) {
 
 }
 
-void tiny_pool_kill(pool_t *pool) {
+//void tiny_pool_kill(pool_t *pool) {
+//
+//    printf("pool enter EXITING status\n");
+//
+//    pthread_mutex_lock(&pool->status_changing);
+//
+//    pool->status = EXITING;
+//
+//    pthread_mutex_unlock(&pool->status_changing);
+//
+//}
 
-    printf("pool enter EXITING status\n");
+void tiny_pool_wait(pool_t *pool) {
 
-    pthread_mutex_lock(&pool->status_changing);
+    // TODO: wait all tasks exit
 
-    pool->status = EXITING;
-
-    pthread_mutex_unlock(&pool->status_changing);
+    // TODO: check `busy_thread_num` == 0 and queue empty
 
 }
 
+void tiny_pool_join(pool_t *pool) {
+
+    // TODO: set status -> JOINING -> avoid submit
+
+    // TODO: wait --until--> queue empty
+
+    // TODO: set status -> EXITING -> some thread may exit
+
+    // TODO: signal broadcast -> wait all thread exit
+
+}

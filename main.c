@@ -1,23 +1,15 @@
 #include <stdio.h>
-#include <pthread.h>
 #include <unistd.h>
 #include "tiny_pool.h"
 
 void demo_fun(void *i) {
-
-    int k = *(int*)i;
-
-    printf("demo func sleep %ds\n", k);
-
-    sleep(k);
-
-    printf("demo func %d wake up\n", k);
-
+    int num = *(int*)i;
+    printf("demo func sleep %ds\n", num);
+    sleep(num);
+    printf("demo func %d wake up\n", num);
 }
 
 int main() {
-
-//    pthread_t tid;
 
     pool_t *pool = tiny_pool_create(2);
 
@@ -41,12 +33,12 @@ int main() {
 
     // TODO: tiny pool join
 
-    printf("pool try exit\n");
-    tiny_pool_kill(pool);
+//    printf("pool try exit\n");
+//    tiny_pool_kill(pool);
 
     // TODO: tiny pool destroy
 
-    sleep(20);
+    sleep(10);
 
     printf("main exit\n");
 
