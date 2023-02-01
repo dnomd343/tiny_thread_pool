@@ -3,45 +3,67 @@
 #include "tiny_pool.h"
 
 pool_t* tiny_pool_create(uint32_t size) {
-
-    // TODO: return NULL when error
-
-    printf("create thread pool size -> %d\n", size);
-
+    /// thread pool struct create
     pool_t *pool = (pool_t*)malloc(sizeof(pool_t));
-
     if (pool == NULL) {
-        return NULL;
+        return NULL; // malloc pool failed -> stop create
     }
 
+    /// threads memory initialize
     pool->thread_num = size;
     pool->threads = (pthread_t*)malloc(sizeof(pthread_t) * size);
-
     if (pool->threads == NULL) {
-
         free(pool);
+        return NULL; // malloc threads failed -> stop create
+    }
+    memset(pool->threads, 0, sizeof(pthread_t) * size); // clean thread ids as zero
 
-        return NULL;
+    /// variable initialization
+    pool->busy_thr_num = 0;
+    pool->status = PREPARING;
+    pool->task_queue_size = 0;
+    pool->task_queue_rear = NULL;
+    pool->task_queue_front = NULL;
+
+    /// thread mutex initialization
+    if (pthread_mutex_init(&pool->status_mutex, NULL)) {
+        free(pool->threads);
+        free(pool);
+        return NULL; // status mutex init error -> stop create
+    }
+    if (pthread_mutex_init(&pool->task_queue_busy, NULL)) {
+        pthread_mutex_destroy(&pool->status_mutex);
+        free(pool->threads);
+        free(pool);
+        return NULL; // queue mutex init error -> stop create
+    }
+    if (pthread_mutex_init(&pool->busy_thr_num_mutex, NULL)) {
+        pthread_mutex_destroy(&pool->task_queue_busy);
+        pthread_mutex_destroy(&pool->status_mutex);
+        free(pool->threads);
+        free(pool);
+        return NULL; // busy thread num mutex init error -> stop create
     }
 
-    memset(pool->threads, 0, sizeof(pthread_t) * size);
-
-    pool->status = PREPARING;
-    pthread_mutex_init(&pool->status_changing, NULL);
-
-    pool->busy_thread_num = 0;
-    pthread_mutex_init(&pool->busy_thread_num_mutex, NULL);
-
-    pool->task_queue_front = NULL;
-    pool->task_queue_rear = NULL;
-    pool->task_queue_size = 0;
-    pthread_mutex_init(&pool->task_queue_busy, NULL);
-
-    pthread_cond_init(&pool->task_queue_empty, NULL);
-    pthread_cond_init(&pool->task_queue_not_empty, NULL);
-
-    return pool;
-
+    /// thread condition variable initialization
+    if (pthread_cond_init(&pool->task_queue_empty, NULL)) {
+        pthread_mutex_destroy(&pool->busy_thr_num_mutex);
+        pthread_mutex_destroy(&pool->task_queue_busy);
+        pthread_mutex_destroy(&pool->status_mutex);
+        free(pool->threads);
+        free(pool);
+        return NULL; // pthread cond init error -> stop create
+    }
+    if (pthread_cond_init(&pool->task_queue_not_empty, NULL)) {
+        pthread_cond_destroy(&pool->task_queue_empty);
+        pthread_mutex_destroy(&pool->busy_thr_num_mutex);
+        pthread_mutex_destroy(&pool->task_queue_busy);
+        pthread_mutex_destroy(&pool->status_mutex);
+        free(pool->threads);
+        free(pool);
+        return NULL;
+    }
+    return pool; // tiny thread pool create success
 }
 
 void task_queue_push(pool_t *pool, task_t *task) {
@@ -85,11 +107,11 @@ void task_queue_push(pool_t *pool, task_t *task) {
 
 }
 
-void tiny_pool_submit(pool_t *pool, void (*func)(void*), void *arg) {
+bool tiny_pool_submit(pool_t *pool, void (*func)(void*), void *arg) {
 
     // check status -> failed
     if (pool->status == EXITING) {
-        return;
+        return false;
         // TODO: return false here
     }
 
@@ -107,6 +129,7 @@ void tiny_pool_submit(pool_t *pool, void (*func)(void*), void *arg) {
 
     // TODO: return bool true
 
+    return true;
 }
 
 task_t* task_queue_pop(pool_t *pool) {
@@ -211,9 +234,9 @@ void tiny_pool_boot(pool_t *pool) {
 
     printf("thread boot complete\n");
 
-    pthread_mutex_lock(&pool->status_changing);
+    pthread_mutex_lock(&pool->status_mutex);
     pool->status = RUNNING;
-    pthread_mutex_unlock(&pool->status_changing);
+    pthread_mutex_unlock(&pool->status_mutex);
 
     pthread_mutex_unlock(&pool->task_queue_busy);
 
