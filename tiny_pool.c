@@ -70,41 +70,58 @@ void task_queue_push(pool_t *pool, task_t *task) {
 
     printf("push one task\n");
 
-    // TODO: lock task queue
-    pthread_mutex_lock(&pool->task_queue_busy);
-
-    if (pool->task_queue_rear == NULL) { // empty queue
-
+    pthread_mutex_lock(&pool->task_queue_busy); // lock task queue
+    if (pool->task_queue_rear == NULL) { // task queue is empty
         pool->task_queue_front = task;
+        pool->task_queue_rear = task; // init task queue with one element
+    } else {
+        pool->task_queue_rear->next = task; // task queue push back
         pool->task_queue_rear = task;
-
-    } else { // queue with element
-
-        pool->task_queue_rear->next = task;
-        pool->task_queue_rear = task;
-
     }
-
     ++pool->task_queue_size;
 
     printf("push success -> size = %d\n", pool->task_queue_size);
 
-    // TODO: unlock task queue
-    pthread_mutex_unlock(&pool->task_queue_busy);
+    pthread_mutex_unlock(&pool->task_queue_busy); // unlock task queue
+    if (pool->status >= RUNNING) { // avoid send signal in PREPARING stage
 
+        printf("signal -> queue not empty\n");
 
-    if (pool->status == RUNNING) {
+        pthread_cond_signal(&pool->task_queue_not_empty); // active one blocking thread
+    }
+}
 
-        // TODO: send cond signal
+task_t* task_queue_pop(pool_t *pool) { // pop one task with blocking wait
 
-//        printf("send signal -> queue not empty\n");
-//        pthread_cond_signal(&pool->task_queue_not_empty);
+    printf("try pop one task\n");
 
-        printf("send broadcast -> queue not empty\n");
-        pthread_cond_broadcast(&pool->task_queue_not_empty);
+    pthread_mutex_lock(&pool->task_queue_busy); // lock task queue
+    while (pool->task_queue_front == NULL) { // loop until task queue not empty
+
+        printf("pop start wait\n");
+
+        pthread_cond_wait(&pool->task_queue_not_empty, &pool->task_queue_busy); // wait new task added
+
+        printf("pop exit wait\n");
 
     }
 
+    printf("pop new task\n");
+
+    task_t *front = pool->task_queue_front;
+    if (pool->task_queue_front == pool->task_queue_rear) { // only one element
+        pool->task_queue_front = NULL; // clear task queue
+        pool->task_queue_rear = NULL;
+        pthread_cond_signal(&pool->task_queue_empty); // active blocking join thread
+    } else {
+        pool->task_queue_front = front->next; // pop first task
+    }
+    --pool->task_queue_size;
+
+    printf("pop success -> size = %d\n", pool->task_queue_size);
+
+    pthread_mutex_unlock(&pool->task_queue_busy); // unlock task queue
+    return front; // success pop one task
 }
 
 bool tiny_pool_submit(pool_t *pool, void (*func)(void*), void *arg) {
@@ -131,56 +148,6 @@ bool tiny_pool_submit(pool_t *pool, void (*func)(void*), void *arg) {
 
     return true;
 }
-
-task_t* task_queue_pop(pool_t *pool) {
-
-    printf("try pop one task\n");
-
-    // TODO: lock task queue
-    pthread_mutex_lock(&pool->task_queue_busy);
-
-    while (pool->task_queue_front == NULL) {
-
-        printf("pop enter wait\n");
-
-        // TODO: wait new task added
-        pthread_cond_wait(&pool->task_queue_not_empty, &pool->task_queue_busy);
-
-        printf("pop exit wait\n");
-
-    }
-
-    printf("pop exit loop\n");
-
-    task_t *front = pool->task_queue_front;
-
-    if (pool->task_queue_front == pool->task_queue_rear) { // only one element
-
-        // queue is empty now
-        pool->task_queue_front = NULL;
-        pool->task_queue_rear = NULL;
-
-        /// will it cause dead lock?
-        pthread_cond_signal(&pool->task_queue_empty);
-
-    } else {
-
-        pool->task_queue_front = front->next;
-
-    }
-
-    --pool->task_queue_size;
-
-    printf("pop success -> size = %d\n", pool->task_queue_size);
-
-    // TODO: unlock task queue
-    pthread_mutex_unlock(&pool->task_queue_busy);
-
-
-    return front;
-
-}
-
 
 void* thread_entry(void *pool_ptr) {
 
