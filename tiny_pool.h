@@ -46,10 +46,10 @@
 /// or `tiny_pool_detach` interface.
 
 enum pool_status {
-    PREPARING,
-    RUNNING,
-    STOPPING,
-    EXITING,
+    PREPARING = 0,
+    RUNNING = 1,
+    STOPPING = 2,
+    EXITING = 3,
 };
 
 typedef struct task_t {
