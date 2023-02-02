@@ -93,22 +93,22 @@ void task_queue_push(pool_t *pool, task_t *task) {
 
 task_t* task_queue_pop(pool_t *pool) { // pop one task with blocking wait
 
-    printf("try pop one task\n");
+    printf("%lu -> try pop one task\n", pthread_self());
 
     pthread_mutex_lock(&pool->task_queue_busy); // lock task queue
     while (pool->task_queue_front == NULL) { // loop until task queue not empty
 
-        printf("pop start wait\n");
+        printf("%lu -> pop start wait\n", pthread_self());
 
         // TODO: at EXITING process may receive active broadcast -> we should stop pop task here
         //       should we cancel thread here directly, or return NULL for sub thread loop?
         pthread_cond_wait(&pool->task_queue_not_empty, &pool->task_queue_busy); // wait new task added
 
-        printf("pop exit wait\n");
+        printf("%lu -> pop exit wait\n", pthread_self());
 
     }
 
-    printf("pop new task\n");
+    printf("%lu -> pop new task\n", pthread_self());
 
     bool queue_empty = false;
     task_t *front = pool->task_queue_front;
@@ -121,7 +121,7 @@ task_t* task_queue_pop(pool_t *pool) { // pop one task with blocking wait
     }
     --pool->task_queue_size;
 
-    printf("pop success -> size = %d\n", pool->task_queue_size);
+    printf("%lu -> pop success -> size = %d\n", pthread_self(), pool->task_queue_size);
 
     pthread_mutex_unlock(&pool->task_queue_busy); // unlock task queue
 
@@ -132,9 +132,6 @@ task_t* task_queue_pop(pool_t *pool) { // pop one task with blocking wait
 }
 
 bool tiny_pool_submit(pool_t *pool, void (*func)(void*), void *arg) {
-    if (pool->status > RUNNING) {
-        return false; // adding task is prohibited after STOPPING
-    }
     task_t *new_task = (task_t*)malloc(sizeof(task_t));
     if (new_task == NULL) {
         return false; // malloc new task error -> stop submit
@@ -142,15 +139,27 @@ bool tiny_pool_submit(pool_t *pool, void (*func)(void*), void *arg) {
     new_task->func = func; // load custom task
     new_task->arg = arg;
     new_task->next = NULL;
-    task_queue_push(pool, new_task); // push into task queue
+
+    // TODO: warning -> check dead lock here
+    pthread_mutex_lock(&pool->status_mutex);
+    if (pool->status > RUNNING) {
+        free(new_task);
+        return false; // adding task is prohibited after STOPPING
+    } else {
+        task_queue_push(pool, new_task); // push into task queue
+    }
+    pthread_mutex_unlock(&pool->status_mutex);
     return true; // task push success
 }
 
 void* thread_entry(void *pool_ptr) { // main loop for sub thread
     pool_t *pool = (pool_t*)pool_ptr;
+
+    printf("start thread %lu\n", pthread_self());
+
     while (pool->status != EXITING) { // loop until enter EXITING mode
 
-        printf("sub thread working\n");
+        printf("%lu -> sub thread working\n", pthread_self());
 
         task_t *task = task_queue_pop(pool); // pop one task -> blocking function
 
@@ -167,7 +176,7 @@ void* thread_entry(void *pool_ptr) { // main loop for sub thread
         free(task); // free allocated memory
     }
 
-    printf("sub thread exit\n");
+    printf("%lu -> sub thread exit\n", pthread_self());
 
     return NULL; // sub thread exit
 }
@@ -175,55 +184,31 @@ void* thread_entry(void *pool_ptr) { // main loop for sub thread
 // TODO: should we return a bool value?
 void tiny_pool_boot(pool_t *pool) {
 
-    // TODO: create admin thread
-
-    // TODO: create N work-threads (using N = 8 in dev)
-
     // TODO: avoid booting multi-times
 
+    pthread_mutex_lock(&pool->status_mutex);
+
+    if (pool->status != PREPARING) {
+        pthread_mutex_unlock(&pool->status_mutex);
+        return;
+    }
 
     pthread_mutex_lock(&pool->task_queue_busy);
 
     for (uint32_t i = 0; i < pool->thread_num; ++i) {
-
-        printf("start thread %d\n", i);
-
         pthread_create(&(pool->threads[i]), NULL, thread_entry, (void*)pool);
-
     }
 
     printf("thread boot complete\n");
 
-    pthread_mutex_lock(&pool->status_mutex);
     pool->status = RUNNING;
-    pthread_mutex_unlock(&pool->status_mutex);
 
     pthread_mutex_unlock(&pool->task_queue_busy);
+    pthread_mutex_unlock(&pool->status_mutex);
 
 }
 
-
-//void tiny_pool_kill(pool_t *pool) {
-//
-//    printf("pool enter EXITING status\n");
-//
-//    pthread_mutex_lock(&pool->status_changing);
-//
-//    pool->status = EXITING;
-//
-//    pthread_mutex_unlock(&pool->status_changing);
-//
-//}
-
-void tiny_pool_wait(pool_t *pool) {
-
-    // TODO: wait all tasks exit
-
-    // TODO: check `busy_thread_num` == 0 and queue empty
-
-}
-
-void tiny_pool_join(pool_t *pool) {
+bool tiny_pool_join(pool_t *pool) {
 
     // TODO: set status -> JOINING -> avoid submit
 
@@ -233,4 +218,30 @@ void tiny_pool_join(pool_t *pool) {
 
     // TODO: signal broadcast -> wait all thread exit
 
+
+    printf("start pool join\n");
+
+    pthread_mutex_lock(&pool->status_mutex);
+
+    if (pool->status != RUNNING) {
+
+        pthread_mutex_unlock(&pool->status_mutex);
+
+        return false;
+
+    }
+    pool->status = STOPPING;
+
+
+    // TODO: join process
+
+    return true;
 }
+
+//void tiny_pool_wait(pool_t *pool) {
+
+    // TODO: wait all tasks exit
+
+    // TODO: check `busy_thread_num` == 0 and queue empty
+
+//}

@@ -92,10 +92,10 @@ bool tiny_pool_submit(pool_t *pool, void (*func)(void*), void *arg);
 void tiny_pool_boot(pool_t *pool);
 
 /// This function will change the thread pool from `RUNNING` to `STOPPING`, and enter the
-/// `EXITING` state when the queue is empty, likewise, if the state is non `RUNNING` when
-/// entered, it will also have no effect. All tasks will automatically free resources after
+/// `EXITING` state when the queue is empty. If the state is non `RUNNING` when entered,
+/// it will return `false` value. All tasks will automatically free resources after
 /// completion. Note that it is blocking and may take a considerable amount of time.
-void tiny_pool_join(pool_t *pool);
+bool tiny_pool_join(pool_t *pool);
 
 /// It is basically the same as `tiny_pool_join` in function, the difference is that it is
 /// non-blocking, that is, it will automatically handle the remaining tasks and complete
