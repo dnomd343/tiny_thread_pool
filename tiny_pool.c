@@ -56,7 +56,7 @@ pool_t* tiny_pool_create(uint32_t size) {
 }
 
 void task_queue_push(pool_t *pool, task_t *task) {
-    printf("push new task\n");
+    printf("push new task %d\n", *(int*)task->arg);
     if (pool->task_queue_rear == NULL) { // task queue is empty
         pool->task_queue_front = task;
         pool->task_queue_rear = task; // init task queue with one element
@@ -69,12 +69,12 @@ void task_queue_push(pool_t *pool, task_t *task) {
 }
 
 task_t* task_queue_pop(pool_t *pool) { // pop one task with blocking wait
-    printf("%lu -> pop one task\n", pthread_self());
+    printf("%lu -> start pop task\n", pthread_self());
 
     /// wait until task queue not empty
     pthread_mutex_lock(&pool->mutex); // lock pool struct
     while (pool->task_queue_front == NULL) { // loop until task queue not empty
-        printf("%lu -> pop start wait\n", pthread_self());
+        printf("%lu -> pop wait\n", pthread_self());
         pthread_cond_wait(&pool->task_queue_not_empty, &pool->mutex); // wait new task added
         printf("%lu -> pop exit wait\n", pthread_self());
         if (pool->status == EXITING) {
@@ -82,7 +82,7 @@ task_t* task_queue_pop(pool_t *pool) { // pop one task with blocking wait
             pthread_exit(NULL); // sub thread exit at EXITING stage
         }
     }
-    printf("%lu -> pop new task\n", pthread_self());
+    printf("%lu -> pop new task %d\n", pthread_self(), *(int*)pool->task_queue_front->arg);
 
     /// pop first task from queue
     bool empty_flag = false;
@@ -99,6 +99,7 @@ task_t* task_queue_pop(pool_t *pool) { // pop one task with blocking wait
 
     /// send signal to active blocking thread
     if (empty_flag) { // send signal after mutex unlocked
+        printf("signal -> task queue empty\n");
         pthread_cond_signal(&pool->task_queue_empty); // active pool join thread
     }
     return front; // success pop one task
@@ -208,7 +209,6 @@ bool tiny_pool_join(pool_t *pool) {
     }
     printf("task queue empty\n");
 
-
     pool->status = EXITING;
     printf("pool status -> EXITING\n");
 
@@ -220,12 +220,6 @@ bool tiny_pool_join(pool_t *pool) {
 
     pthread_mutex_unlock(&pool->mutex); // prevent other functions blocking waiting
 
-
-    printf("unlock mutex and send broadcast\n");
-//    pthread_cond_broadcast(&pool->task_queue_not_empty); // send broadcast to trigger idle threads
-
-    // TODO: signal broadcast and wait all thread exit
-
     printf("start sub threads joining\n");
     for (uint32_t i = 0; i < pool->thread_num; ++i) {
         pthread_cond_broadcast(&pool->task_queue_not_empty); // trigger idle threads
@@ -233,6 +227,20 @@ bool tiny_pool_join(pool_t *pool) {
         printf("sub thread %lu joined\n", pool->threads[i]);
     }
     printf("sub threads join complete\n");
+
+    // TODO: free resource
+
+    printf("start free pool resource\n");
+
+    pthread_cond_destroy(&pool->without_busy_thread);
+    pthread_cond_destroy(&pool->task_queue_not_empty);
+    pthread_cond_destroy(&pool->task_queue_empty);
+    pthread_mutex_destroy(&pool->mutex);
+
+    free(pool->threads);
+    free(pool);
+
+    printf("free pool resource complete\n");
 
     return true;
 }

@@ -14,9 +14,10 @@ void demo_fun(void *i) {
 
 int main() {
 
-    pool_t *pool = tiny_pool_create(2);
+//    pool_t *pool = tiny_pool_create(2);
+    pool_t *pool = tiny_pool_create(4);
 
-    int dat[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    int dat[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
     tiny_pool_submit(pool, demo_fun, (void*)&dat[0]);
     tiny_pool_submit(pool, demo_fun, (void*)&dat[1]);
 
@@ -31,10 +32,15 @@ int main() {
     tiny_pool_submit(pool, demo_fun, (void*)&dat[2]);
     tiny_pool_submit(pool, demo_fun, (void*)&dat[3]);
     tiny_pool_submit(pool, demo_fun, (void*)&dat[4]);
+    tiny_pool_submit(pool, demo_fun, (void*)&dat[5]);
+    tiny_pool_submit(pool, demo_fun, (void*)&dat[6]);
 
     printf("+ main: sleep 8s\n");
     sleep(6);
     printf("+ main: wake up\n");
+
+    tiny_pool_submit(pool, demo_fun, (void*)&dat[7]);
+    tiny_pool_submit(pool, demo_fun, (void*)&dat[8]);
 
     printf("+ main: pool joining\n");
     tiny_pool_join(pool);
