@@ -45,7 +45,7 @@
 /// as a fatal error in the main program). In other cases, it is recommended to use `tiny_pool_join`
 /// or `tiny_pool_detach` interface.
 
-enum pool_status {
+enum pool_stage {
     PREPARING = 0,
     RUNNING = 1,
     STOPPING = 2,
@@ -59,22 +59,16 @@ typedef struct task_t {
 } task_t;
 
 typedef struct pool_t {
-
     pthread_mutex_t mutex; // global pool mutex
 
     pthread_t *threads; // store thread id
     uint32_t thread_num; // number of threads
-
-    enum pool_status status; // life cycle state
-//    pthread_mutex_t status_mutex; // mutex for `status`
-
     uint32_t busy_thr_num; // number of working threads
-//    pthread_mutex_t busy_thr_num_mutex; // mutex for `busy_thr_num`
+    enum pool_stage status; // tiny pool life cycle stage
 
     task_t *task_queue_front; // head of task queue
     task_t *task_queue_rear; // end of task queue
     uint32_t task_queue_size; // size of task queue
-//    pthread_mutex_t task_queue_busy; // mutex for `task_queue_xxx`
 
     pthread_cond_t task_queue_empty; // condition for task queue becomes empty
     pthread_cond_t task_queue_not_empty; // condition for task queue becomes not empty

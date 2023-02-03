@@ -4,9 +4,12 @@
 
 void demo_fun(void *i) {
     int num = *(int*)i;
-    printf("demo func sleep %ds\n", num);
-    sleep(num);
-    printf("demo func %d wake up\n", num);
+    printf("task %d start\n", num);
+    for (int t = 0; t < num; ++t) {
+        sleep(1);
+        printf("task %d running...\n", num);
+    }
+    printf("task %d complete\n", num);
 }
 
 int main() {
@@ -17,19 +20,21 @@ int main() {
     tiny_pool_submit(pool, demo_fun, (void*)&dat[0]);
     tiny_pool_submit(pool, demo_fun, (void*)&dat[1]);
 
-    printf("pool booting\n");
+    printf("main: pool booting\n");
     tiny_pool_boot(pool);
-    printf("pool running\n");
+    printf("main: pool boot complete\n");
 
-    printf("main thread sleep\n");
+    printf("main: sleep 5s\n");
     sleep(5);
-    printf("main thread wake up\n");
+    printf("main: wake up\n");
 
     tiny_pool_submit(pool, demo_fun, (void*)&dat[2]);
     tiny_pool_submit(pool, demo_fun, (void*)&dat[3]);
     tiny_pool_submit(pool, demo_fun, (void*)&dat[4]);
 
-    sleep(8);
+    printf("main: sleep 8s\n");
+    sleep(6);
+    printf("main: wake up\n");
 
     // TODO: tiny pool join
 
