@@ -4,12 +4,12 @@
 
 void demo_fun(void *i) {
     int num = *(int*)i;
-    printf("task %d start\n", num);
+    printf("  task %d start\n", num);
     for (int t = 0; t < num; ++t) {
         sleep(1);
-        printf("task %d running...\n", num);
+        printf("  task %d running...\n", num);
     }
-    printf("task %d complete\n", num);
+    printf("  task %d complete\n", num);
 }
 
 int main() {
@@ -20,32 +20,34 @@ int main() {
     tiny_pool_submit(pool, demo_fun, (void*)&dat[0]);
     tiny_pool_submit(pool, demo_fun, (void*)&dat[1]);
 
-    printf("main: pool booting\n");
+    printf("+ main: pool booting\n");
     tiny_pool_boot(pool);
-    printf("main: pool boot complete\n");
+    printf("+ main: pool boot complete\n");
 
-    printf("main: sleep 5s\n");
+    printf("+ main: sleep 5s\n");
     sleep(5);
-    printf("main: wake up\n");
+    printf("+ main: wake up\n");
 
     tiny_pool_submit(pool, demo_fun, (void*)&dat[2]);
     tiny_pool_submit(pool, demo_fun, (void*)&dat[3]);
     tiny_pool_submit(pool, demo_fun, (void*)&dat[4]);
 
-    printf("main: sleep 8s\n");
+    printf("+ main: sleep 8s\n");
     sleep(6);
-    printf("main: wake up\n");
+    printf("+ main: wake up\n");
 
-    // TODO: tiny pool join
+    printf("+ main: pool joining\n");
+    tiny_pool_join(pool);
+    printf("+ main: pool join complete\n");
 
 //    printf("pool try exit\n");
 //    tiny_pool_kill(pool);
 
     // TODO: tiny pool destroy
 
-    sleep(10);
+//    sleep(10);
 
-    printf("main exit\n");
+    printf("+ main exit\n");
 
     return 0;
 }

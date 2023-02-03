@@ -72,6 +72,7 @@ typedef struct pool_t {
 
     pthread_cond_t task_queue_empty; // condition for task queue becomes empty
     pthread_cond_t task_queue_not_empty; // condition for task queue becomes not empty
+    pthread_cond_t without_busy_thread; // condition for busy thread number becomes zero
 } pool_t;
 
 /// This function create a new thread pool, you need to specify the number of threads,
