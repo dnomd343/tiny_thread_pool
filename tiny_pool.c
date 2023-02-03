@@ -186,6 +186,22 @@ void tiny_pool_boot(pool_t *pool) {
     pthread_mutex_unlock(&pool->mutex);
 }
 
+void free_tiny_pool(pool_t *pool) {
+
+    printf("start free pool resource\n");
+
+    pthread_cond_destroy(&pool->without_busy_thread);
+    pthread_cond_destroy(&pool->task_queue_not_empty);
+    pthread_cond_destroy(&pool->task_queue_empty);
+    pthread_mutex_destroy(&pool->mutex);
+
+    free(pool->threads);
+    free(pool);
+
+    printf("free pool resource complete\n");
+
+}
+
 bool tiny_pool_join(pool_t *pool) {
     printf("start pool join\n");
 
@@ -228,42 +244,33 @@ bool tiny_pool_join(pool_t *pool) {
     }
     printf("sub threads join complete\n");
 
-    // TODO: free resource
-
-    printf("start free pool resource\n");
-
-    pthread_cond_destroy(&pool->without_busy_thread);
-    pthread_cond_destroy(&pool->task_queue_not_empty);
-    pthread_cond_destroy(&pool->task_queue_empty);
-    pthread_mutex_destroy(&pool->mutex);
-
-    free(pool->threads);
-    free(pool);
-
-    printf("free pool resource complete\n");
+    free_tiny_pool(pool);
 
     return true;
 }
 
 void* run_pool_join(void *pool) {
-
     printf("run pool join from detach\n");
-
     tiny_pool_join((pool_t*)pool);
-
     printf("pool join complete\n");
-
     pthread_exit(NULL);
 }
 
 void tiny_pool_detach(pool_t *pool) {
-
     pthread_t tid;
-
     printf("run pool detach\n");
-
     pthread_create(&tid, NULL, run_pool_join, (void*)pool);
-
     pthread_detach(tid);
+}
 
+void tiny_pool_kill(pool_t *pool) {
+    printf("run pool kill\n");
+    if (pool->status > PREPARING) {
+        printf("kill sub threads\n");
+        for (uint32_t i = 0; i < pool->thread_num; ++i) {
+            pthread_cancel(pool->threads[i]);
+        }
+        printf("kill complete\n");
+    }
+    free_tiny_pool(pool);
 }

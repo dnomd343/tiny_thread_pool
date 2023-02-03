@@ -46,16 +46,14 @@ int main() {
 //    tiny_pool_join(pool);
 //    printf("+ main: pool join complete\n");
 
-    printf("+ main: pool detach\n");
-    tiny_pool_detach(pool);
-    printf("+ main: pool detach complete\n");
-    sleep(20);
+//    printf("+ main: pool detach\n");
+//    tiny_pool_detach(pool);
+//    printf("+ main: pool detach complete\n");
+//    sleep(20);
 
-    // TODO: tiny pool destroy
-//    printf("pool try exit\n");
-//    tiny_pool_kill(pool);
-
-//    sleep(10);
+    printf("+ main: pool kill\n");
+    tiny_pool_kill(pool);
+    printf("+ main: pool kill complete\n");
 
     printf("+ main exit\n");
 
