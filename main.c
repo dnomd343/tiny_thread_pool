@@ -42,14 +42,18 @@ int main() {
     tiny_pool_submit(pool, demo_fun, (void*)&dat[7]);
     tiny_pool_submit(pool, demo_fun, (void*)&dat[8]);
 
-    printf("+ main: pool joining\n");
-    tiny_pool_join(pool);
-    printf("+ main: pool join complete\n");
+//    printf("+ main: pool joining\n");
+//    tiny_pool_join(pool);
+//    printf("+ main: pool join complete\n");
 
-//    printf("pool try exit\n");
-//    tiny_pool_kill(pool);
+    printf("+ main: pool detach\n");
+    tiny_pool_detach(pool);
+    printf("+ main: pool detach complete\n");
+    sleep(20);
 
     // TODO: tiny pool destroy
+//    printf("pool try exit\n");
+//    tiny_pool_kill(pool);
 
 //    sleep(10);
 

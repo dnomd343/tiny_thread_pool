@@ -244,3 +244,26 @@ bool tiny_pool_join(pool_t *pool) {
 
     return true;
 }
+
+void* run_pool_join(void *pool) {
+
+    printf("run pool join from detach\n");
+
+    tiny_pool_join((pool_t*)pool);
+
+    printf("pool join complete\n");
+
+    pthread_exit(NULL);
+}
+
+void tiny_pool_detach(pool_t *pool) {
+
+    pthread_t tid;
+
+    printf("run pool detach\n");
+
+    pthread_create(&tid, NULL, run_pool_join, (void*)pool);
+
+    pthread_detach(tid);
+
+}
