@@ -78,6 +78,7 @@ task_t* task_queue_pop(pool_t *pool) { // pop one task with blocking wait
         pthread_cond_wait(&pool->task_queue_not_empty, &pool->mutex); // wait new task added
         printf("%lu -> pop exit wait\n", pthread_self());
         if (pool->status == EXITING) {
+            pthread_mutex_unlock(&pool->mutex);
             printf("%lu -> sub thread exit from idle\n", pthread_self());
             pthread_exit(NULL); // sub thread exit at EXITING stage
         }
@@ -190,9 +191,15 @@ void free_tiny_pool(pool_t *pool) {
 
     printf("start free pool resource\n");
 
+//    pthread_mutex_unlock(&pool->mutex);
+
+//    printf("flag 1\n");
+
     pthread_cond_destroy(&pool->without_busy_thread);
     pthread_cond_destroy(&pool->task_queue_not_empty);
     pthread_cond_destroy(&pool->task_queue_empty);
+//    printf("flag 2\n");
+
     pthread_mutex_destroy(&pool->mutex);
 
     free(pool->threads);
@@ -201,6 +208,8 @@ void free_tiny_pool(pool_t *pool) {
     printf("free pool resource complete\n");
 
 }
+
+#include <unistd.h>
 
 bool tiny_pool_join(pool_t *pool) {
     printf("start pool join\n");
@@ -237,11 +246,26 @@ bool tiny_pool_join(pool_t *pool) {
     pthread_mutex_unlock(&pool->mutex); // prevent other functions blocking waiting
 
     printf("start sub threads joining\n");
+
+//    for (uint32_t i = 0; i < pool->thread_num; ++i) {
+//        pthread_cond_broadcast(&pool->task_queue_not_empty); // trigger idle threads
+//        while (pthread_mutex_trylock(&pool->mutex)) {
+//            printf("try lock again\n");
+//        }
+//        pthread_mutex_unlock(&pool->mutex);
+//    }
+//
+//    printf("free threads complete\n");
+
     for (uint32_t i = 0; i < pool->thread_num; ++i) {
         pthread_cond_broadcast(&pool->task_queue_not_empty); // trigger idle threads
+        printf("start join sub thread %lu\n", pool->threads[i]);
         pthread_join(pool->threads[i], NULL);
         printf("sub thread %lu joined\n", pool->threads[i]);
     }
+
+//    sleep(10);
+
     printf("sub threads join complete\n");
 
     free_tiny_pool(pool);

@@ -75,6 +75,10 @@ typedef struct pool_t {
     pthread_cond_t without_busy_thread; // condition for busy thread number becomes zero
 } pool_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /// This function create a new thread pool, you need to specify the number of threads,
 /// it will be in the `PREPARING` state, and return NULL on failure.
 pool_t* tiny_pool_create(uint32_t size);
@@ -103,5 +107,9 @@ void tiny_pool_detach(pool_t *pool);
 /// This function will forcibly clear the task queue and reclaim all resources. Note that
 /// this will cause the interruption of running tasks and the loss of un-running tasks.
 void tiny_pool_kill(pool_t *pool);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif
