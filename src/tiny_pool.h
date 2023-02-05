@@ -1,9 +1,14 @@
 #ifndef TINY_POOL_H_
 #define TINY_POOL_H_
 
-#include <stdint.h>
 #include <pthread.h>
+#ifndef __cplusplus
+#include <stdint.h>
 #include <stdbool.h>
+#else
+#include <cstdint>
+#include <cstdbool>
+#endif
 
 /// This is a lightweight thread pool designed for linux. It is implemented in C language. Its
 /// goal is to provide simple and stable services, so it does not provide functions such as priority
