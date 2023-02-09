@@ -1,12 +1,10 @@
 cmake_minimum_required(VERSION 3.0)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_C_STANDARD 99)
 
-project(tiny_thread_demo LANGUAGES CXX)
+project(tiny_thread_pool LANGUAGES C)
 
-include_directories(src)
+add_library(tiny_pool tiny_pool.c)
+target_link_libraries(tiny_pool pthread)
 
-add_subdirectory(src)
-
-add_executable(demo demo.cc)
-target_link_libraries(demo tiny_pool)
+add_subdirectory(demo/cpp)

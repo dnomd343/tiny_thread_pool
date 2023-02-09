@@ -20,7 +20,6 @@ public:
     auto submit(Func &&func, Args &&...args) -> std::future<decltype(func(args...))>;
 };
 
-
 template <typename Func, typename ...Args>
 auto TinyPool::submit(Func &&func, Args &&...args) -> std::future<decltype(func(args...))> {
     std::function<decltype(func(args...))()> wrap_func = std::bind(
@@ -37,7 +36,7 @@ auto TinyPool::submit(Func &&func, Args &&...args) -> std::future<decltype(func(
     return func_ptr->get_future();
 }
 
-/// -------------------------------- start test --------------------------------
+/// ------------------------------------ start test ------------------------------------
 
 #include <iostream>
 #include <unistd.h>
@@ -53,8 +52,6 @@ int test_func(char c) {
 }
 
 int main() {
-    std::cout << "tiny thread pool demo start" << std::endl;
-
     auto pool = TinyPool(3);
 
     auto f0 = pool.submit(test_func, '0');
@@ -86,7 +83,4 @@ int main() {
     printf("get future: %d\n", f1.get());
     printf("get future: %d\n", f9.get());
     printf("get future: %d\n", f7.get());
-
-    std::cout << "tiny thread pool demo exit" << std::endl;
-    return 0;
 }

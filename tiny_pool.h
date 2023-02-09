@@ -10,7 +10,7 @@
 #include <cstdbool>
 #endif
 
-/// This is a lightweight thread pool designed for linux. It is implemented in C language. Its
+/// This is a lightweight thread pool designed for Linux, it is implemented in C language. Its
 /// goal is to provide simple and stable services, so it does not provide functions such as priority
 /// and dynamic adjustment of the number of threads, and only provides the simplest threads pool
 /// implementation.
@@ -33,6 +33,9 @@
 ///              complete their tasks, the thread pool will be destroyed.
 ///
 /// These four life cycles must proceed sequentially: PREPARING -> RUNNING -> STOPPING -> EXITING
+///
+/// NOTE: The STOPPING and EXITING states are automatically managed by the thread pool, and users
+///       do not need to care about them.
 
 /// When using it, you need to use `tiny_pool_create` to create a thread pool first, and then use
 /// the `tiny_pool_submit` function to submit tasks to it. After the preparation is completed, use
@@ -60,7 +63,7 @@ enum pool_stage {
 typedef struct task_t {
     void (*entry)(void*); // function pointer of the task
     void *arg; // argument of task function
-    struct task_t *next; // the next task in the queue
+    struct task_t *next; // next task in the queue
 } task_t;
 
 typedef struct pool_t {

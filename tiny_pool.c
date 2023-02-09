@@ -9,11 +9,11 @@ void* run_pool_join(void *pool) { // single function for detach
 
 void tiny_pool_detach(pool_t *pool) {
     pthread_t tid;
-    pthread_create(&tid, NULL, run_pool_join, (void*)pool);
+    pthread_create(&tid, NULL, run_pool_join, (void*)pool); // new thread for detach
     pthread_detach(tid);
 }
 
-void free_tiny_pool(pool_t *pool) {
+void free_tiny_pool(pool_t *pool) { // free memory and destroy thread pool
     pthread_cond_destroy(&pool->without_busy_thread);
     pthread_cond_destroy(&pool->task_queue_not_empty);
     pthread_cond_destroy(&pool->task_queue_empty);
@@ -23,9 +23,9 @@ void free_tiny_pool(pool_t *pool) {
 }
 
 void tiny_pool_kill(pool_t *pool) {
-    if (pool->status > PREPARING) {
+    if (pool->status > PREPARING) { // threads are running
         for (uint32_t i = 0; i < pool->thread_num; ++i) {
-            pthread_cancel(pool->threads[i]);
+            pthread_cancel(pool->threads[i]); // kill sub threads
         }
     }
     free_tiny_pool(pool); // release thread pool
