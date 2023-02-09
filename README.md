@@ -1,4 +1,4 @@
-## Tiny Thread Pool
+# Tiny Thread Pool
 
 > A lightweight thread pool for Linux.
 
@@ -18,7 +18,7 @@ These four life cycles must proceed sequentially: `PREPARING` `->` `RUNNING` `->
 
 > NOTE: The STOPPING and EXITING states are automatically managed by the thread pool, and users do not need to care about them.
 
-### Usage
+## Usage
 
 When using it, you need to use `tiny_pool_create` to create a thread pool first, and then use the `tiny_pool_submit` function to submit tasks to it. After the preparation is completed, use `tiny_pool_boot` to start the operation of the thread pool, and then you can also add other tasks.
 
@@ -26,9 +26,146 @@ When preparing to exit, you have two options. The first is to use `tiny_pool_joi
 
 In addition, there is a `tiny_pool_kill`, this command will directly clear all tasks, kill all threads, all ongoing work will be canceled, it should only be used in emergency situations (such as a fatal error in the main program). In other cases, it is recommended to use `tiny_pool_join` or `tiny_pool_detach` interface.
 
-### Demo
+## Demo
 
-### Compile
+This is a basic c-based use, file at `demo/c/demo.c`:
+
+```c
+#include <stdio.h>
+#include <unistd.h>
+#include "tiny_pool.h"
+
+void test_fun(void *i) {
+    int num = *(int*)i;
+    printf("task %d start\n", num);
+    for (int t = 0; t < num; ++t) {
+        sleep(1);
+        printf("task %d running...\n", num);
+    }
+    printf("task %d complete\n", num);
+}
+
+int main() {
+    int dat[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+    pool_t *pool = tiny_pool_create(4);
+
+    tiny_pool_submit(pool, test_fun, (void*)&dat[0]);
+    tiny_pool_submit(pool, test_fun, (void*)&dat[1]);
+
+    tiny_pool_boot(pool);
+
+    sleep(5);
+
+    tiny_pool_submit(pool, test_fun, (void*)&dat[2]);
+    tiny_pool_submit(pool, test_fun, (void*)&dat[3]);
+    tiny_pool_submit(pool, test_fun, (void*)&dat[4]);
+    tiny_pool_submit(pool, test_fun, (void*)&dat[5]);
+    tiny_pool_submit(pool, test_fun, (void*)&dat[6]);
+
+    sleep(6);
+
+    tiny_pool_submit(pool, test_fun, (void*)&dat[7]);
+    tiny_pool_submit(pool, test_fun, (void*)&dat[8]);
+
+    tiny_pool_join(pool);
+
+    return 0;
+}
+```
+
+In C++, the C ABI interface can be called directly. Here, OOP is used to repackage, which provides stronger functions under C++11, file at `demo/cpp/demo.cc`:
+
+```cpp
+#include <future>
+#include <functional>
+#include "tiny_pool.h"
+
+class TinyPool {
+    pool_t *pool;
+    static void wrap_c_func(void *func) {
+        (*static_cast<std::function<void()>*>(func))();
+        free(func);
+    }
+
+public:
+    void boot() { tiny_pool_boot(pool); }
+    void join() { tiny_pool_join(pool); }
+    void kill() { tiny_pool_kill(pool); }
+    void detach() { tiny_pool_detach(pool); }
+    explicit TinyPool(uint32_t size) { pool = tiny_pool_create(size); }
+
+    template <typename Func, typename ...Args>
+    auto submit(Func &&func, Args &&...args) -> std::future<decltype(func(args...))>;
+};
+
+template <typename Func, typename ...Args>
+auto TinyPool::submit(Func &&func, Args &&...args) -> std::future<decltype(func(args...))> {
+    std::function<decltype(func(args...))()> wrap_func = std::bind(
+        std::forward<Func>(func), std::forward<Args>(args)...
+    );
+    auto func_ptr = std::make_shared<
+        std::packaged_task<decltype(func(args...))()>
+    >(wrap_func);
+    tiny_pool_submit(pool, TinyPool::wrap_c_func, (void*)(
+        new std::function<void()> (
+            [func_ptr]() { (*func_ptr)(); }
+        )
+    ));
+    return func_ptr->get_future();
+}
+
+/// ------------------------------------ start test ------------------------------------
+
+#include <iostream>
+#include <unistd.h>
+
+int test_func(char c) {
+    int num = c - '0';
+    printf("char -> `%c`\n", c);
+    for (int i = 0; i < num; ++i) {
+        printf("task %d running...\n", num);
+        usleep(500 * 1000);
+    }
+    return num;
+}
+
+int main() {
+    auto pool = TinyPool(3);
+
+    auto f0 = pool.submit(test_func, '0');
+    auto f1 = pool.submit(test_func, '1');
+    auto f2 = pool.submit(test_func, '2');
+    auto f3 = pool.submit(test_func, '3');
+
+    pool.boot();
+
+    auto f4 = pool.submit(test_func, '4');
+    auto f5 = pool.submit(test_func, '5');
+
+    printf("get future: %d\n", f0.get());
+    printf("get future: %d\n", f4.get());
+    printf("get future: %d\n", f3.get());
+
+    auto f6 = pool.submit(test_func, '6');
+    auto f7 = pool.submit(test_func, '7');
+    auto f8 = pool.submit(test_func, '8');
+    auto f9 = pool.submit(test_func, '9');
+
+    printf("get future: %d\n", f2.get());
+    printf("get future: %d\n", f5.get());
+    printf("get future: %d\n", f8.get());
+
+    pool.join();
+
+    printf("get future: %d\n", f6.get());
+    printf("get future: %d\n", f1.get());
+    printf("get future: %d\n", f9.get());
+    printf("get future: %d\n", f7.get());
+}
+```
+
+## Compile
 
 This project uses `CMake` to build and compile, you can use it to get started quickly, or manually call the compiler.
 
@@ -69,6 +206,6 @@ g++ demo/cpp/demo.cc -o demo_cpp -I. -L. -ltiny_pool -lpthread
 gcc -std=gnu99 -shared -fPIC -c tiny_pool.c -o libtiny_pool.so
 ```
 
-### License
+## License
 
 MIT ©2023 [@dnomd343](https://github.com/dnomd343)
