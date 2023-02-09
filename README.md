@@ -30,4 +30,45 @@ In addition, there is a `tiny_pool_kill`, this command will directly clear all t
 
 ### Compile
 
+This project uses `CMake` to build and compile, you can use it to get started quickly, or manually call the compiler.
+
+**CMake**
+
+> This will build `libtiny_pool.a` static library and demo executable.
+
+```bash
+cmake -B cmake-build
+cmake --build cmake-build
+```
+
+> This will build `libtiny_pool.so` dynamic library and demo executable.
+
+```bash
+cmake -B cmake-build -DBUILD_DYN=ON
+cmake --build cmake-build
+```
+
+**GCC**
+
+> Manually build the static library.
+
+```bash
+gcc -std=gnu99 -c tiny_pool.c -o libtiny_pool.a
+```
+
+> Build the demo and link the static library.
+
+```bash
+gcc demo/c/demo.c -o demo_c -I. -L. -ltiny_pool -lpthread
+g++ demo/cpp/demo.cc -o demo_cpp -I. -L. -ltiny_pool -lpthread
+```
+
+> Manually build the dynamic library.
+
+```bash
+gcc -std=gnu99 -shared -fPIC -c tiny_pool.c -o libtiny_pool.so
+```
+
 ### License
+
+MIT ©2023 [@dnomd343](https://github.com/dnomd343)
