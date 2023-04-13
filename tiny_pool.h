@@ -1,123 +1,49 @@
-#ifndef TINY_POOL_H_
-#define TINY_POOL_H_
+#pragma once
 
-#include <pthread.h>
-#ifndef __cplusplus
-#include <stdint.h>
-#include <stdbool.h>
-#else
-#include <cstdint>
-#include <cstdbool>
-#endif
+#include <future>
+#include <functional>
+#include "tiny_pool/tiny_pool.h"
 
-/// This is a lightweight thread pool designed for Linux, it is implemented in C language. Its
-/// goal is to provide simple and stable services, so it does not provide functions such as priority
-/// and dynamic adjustment of the number of threads, and only provides the simplest threads pool
-/// implementation.
+class TinyPool { // OOP for tiny_thread_pool
 
-/// The thread pool allows users to handle multiple tasks conveniently, and saves the additional
-/// overhead of thread creation and destruction, which is very useful in tasks that require a large
-/// number of short-term concurrent executions. There are four life cycle phases in this tiny thread
-/// pool design:
-///
-///   + PREPARING: At this stage, the thread pool is in a ready state, and tasks can be added at
-///                this time, but will not be run.
-///
-///   + RUNNING: The thread pool runs at this stage, all tasks will be assigned to each thread for
-///              execution in sequence, and new tasks can still be added.
-///
-///   + STOPPING: The thread pool is about to be closed, and new tasks are no longer allowed at
-///               this time, and the remaining tasks will be completed one by one.
-///
-///   + EXITING: At this point, there are no pending tasks, only working threads. When all threads
-///              complete their tasks, the thread pool will be destroyed.
-///
-/// These four life cycles must proceed sequentially: PREPARING -> RUNNING -> STOPPING -> EXITING
-///
-/// NOTE: The STOPPING and EXITING states are automatically managed by the thread pool, and users
-///       do not need to care about them.
+    pool_t *pool; // thread pool c-api entry
 
-/// When using it, you need to use `tiny_pool_create` to create a thread pool first, and then use
-/// the `tiny_pool_submit` function to submit tasks to it. After the preparation is completed, use
-/// `tiny_pool_boot` to start the operation of the thread pool, and then you can also add other tasks.
+    static void wrap_c_func(void *func) { // wrap std::function as c-style function ptr
+        auto func_ptr = static_cast<std::function<void()>*>(func);
+        (*func_ptr)();
+        delete func_ptr; // free lambda function
+    }
 
-/// When preparing to exit, you have two options. The first is to use `tiny_pool_join`, which will
-/// block and wait for all remaining tasks to be completed, then destroy the threads and free the
-/// memory. The second is to use `tiny_pool_detach`, which will detach the thread pool and perform
-/// the same behavior as the former after all tasks are completed. It is worth noting that after
-/// running these two functions, no tasks can be added to this thread pool, and you should no longer
-/// perform any operations on the thread pool.
+public:
+    /// Get the number of CPU cores.
+    static uint32_t cpu_core_num() {
+        auto num = std::thread::hardware_concurrency(); // CPU core number
+        return (num == 0) ? 1 : num; // return 1 when fetch failed
+    }
 
-/// In addition, there is a `tiny_pool_kill`, this command will directly clear all tasks, kill all
-/// threads, all ongoing work will be canceled, it should only be used in emergency situations (such
-/// as a fatal error in the main program). In other cases, it is recommended to use `tiny_pool_join`
-/// or `tiny_pool_detach` interface.
+    /// Create thread pool of a specified size.
+    explicit TinyPool(uint32_t size) {
+        pool = tiny_pool_create(size);
+    }
 
-enum pool_stage {
-    PREPARING = 0,
-    RUNNING = 1,
-    STOPPING = 2,
-    EXITING = 3,
+    // TODO: free thread pool when failed
+    void boot() { tiny_pool_boot(pool); }
+    void join() { tiny_pool_join(pool); }
+    void kill() { tiny_pool_kill(pool); }
+    void detach() { tiny_pool_detach(pool); }
+
+    /// Submit new task to the thread pool.
+    template <typename Func, typename ...Args>
+    auto submit(Func &&func, Args &&...args) -> std::future<decltype(func(args...))> {
+        using return_type = decltype(func(args...)); // declare function return type
+        auto func_ptr = std::make_shared<std::packaged_task<return_type()>>(
+            std::bind(std::forward<Func>(func), std::forward<Args>(args)...) // wrap as a function without params
+        );
+        tiny_pool_submit(pool, TinyPool::wrap_c_func, (void*)( // using thread pool interface for submit
+            new std::function<void()> (
+                [func_ptr]() { (*func_ptr)(); } // wrapped as lambda for running task
+            )
+        ));
+        return func_ptr->get_future(); // return future object
+    }
 };
-
-typedef struct task_t {
-    void (*entry)(void*); // function pointer of the task
-    void *arg; // argument of task function
-    struct task_t *next; // next task in the queue
-} task_t;
-
-typedef struct pool_t {
-    pthread_mutex_t mutex; // global pool mutex
-
-    pthread_t *threads; // store thread id
-    uint32_t thread_num; // number of threads
-    uint32_t busy_thr_num; // number of working threads
-    enum pool_stage status; // tiny pool life cycle stage
-
-    task_t *task_queue_front; // head of task queue
-    task_t *task_queue_rear; // end of task queue
-    uint32_t task_queue_size; // size of task queue
-
-    pthread_cond_t task_queue_empty; // condition for task queue becomes empty
-    pthread_cond_t task_queue_not_empty; // condition for task queue becomes not empty
-    pthread_cond_t without_busy_thread; // condition for busy thread number becomes zero
-} pool_t;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/// This function create a new thread pool, you need to specify the number of threads,
-/// it will be in the `PREPARING` state, and return NULL on failure.
-pool_t* tiny_pool_create(uint32_t size);
-
-/// Submit a task to the specified thread pool, and the task is a function pointer (it
-/// receives a void pointer and has no return value) and a parameter. It will return
-/// true if the commit was successful, and false otherwise.
-bool tiny_pool_submit(pool_t *pool, void (*func)(void*), void *arg);
-
-/// This function will start the specified thread pool and change its state from
-/// `PREPARING` to `RUNNING`. If the thread pool is already in non `PREPARING` at runtime,
-/// it will have no effect.
-void tiny_pool_boot(pool_t *pool);
-
-/// This function will change the thread pool from `RUNNING` to `STOPPING`, and enter the
-/// `EXITING` state when the queue is empty. If the state is non `RUNNING` when entered,
-/// it will return `false` value. All tasks will automatically free resources after
-/// completion. Note that it is blocking and may take a considerable amount of time.
-bool tiny_pool_join(pool_t *pool);
-
-/// It is basically the same as `tiny_pool_join` in function, the difference is that it is
-/// non-blocking, that is, it will automatically handle the remaining tasks and complete
-/// resource free process after execution.
-void tiny_pool_detach(pool_t *pool);
-
-/// This function will forcibly clear the task queue and reclaim all resources. Note that
-/// this will cause the interruption of running tasks and the loss of un-running tasks.
-void tiny_pool_kill(pool_t *pool);
-
-#ifdef __cplusplus
-};
-#endif
-
-#endif
