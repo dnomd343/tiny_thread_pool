@@ -20,6 +20,8 @@ These four life cycles must proceed sequentially: `PREPARING` `->` `RUNNING` `->
 
 ## Usage
 
+> If you are using c++, you can check out to the `cpp` branch, which encapsulates these functions and provides more convenient and powerful functions.
+
 When using it, you need to use `tiny_pool_create` to create a thread pool first, and then use the `tiny_pool_submit` function to submit tasks to it. After the preparation is completed, use `tiny_pool_boot` to start the operation of the thread pool, and then you can also add other tasks.
 
 When preparing to exit, you have two options. The first is to use `tiny_pool_join`, which will block and wait for all remaining tasks to be completed, then destroy the threads and free the memory. The second is to use `tiny_pool_detach`, which will detach the thread pool and perform the same behavior as the former after all tasks are completed. It is worth noting that after running these two functions, no tasks can be added to this thread pool, and you should no longer perform any operations on the thread pool.
@@ -63,7 +65,7 @@ gcc -O3 -DNDEBUG -fPIC -shared tiny_pool.o -lpthread -o libtiny_pool.so
 
 ## Demo
 
-Here provide a basic c-based use at `demo.c`, you can try to compile and run it.
+Here provide a basic demo at `demo.c`, you can try to compile and run it.
 
 ```bash
 # static library
