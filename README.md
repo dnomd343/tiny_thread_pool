@@ -51,13 +51,14 @@ cmake --build cmake-build
 You can also build the static library manually.
 
 ```bash
-gcc -std=gnu99 -c tiny_pool.c -o libtiny_pool.a
+gcc -O3 -DNDEBUG -std=gnu99 -c tiny_pool.c -o libtiny_pool.a
 ```
 
 And this command will build the dynamic library.
 
 ```bash
-gcc -std=gnu99 -shared -fPIC -c tiny_pool.c -o libtiny_pool.so
+gcc -O3 -DNDEBUG -fPIC -std=gnu99 -c tiny_pool.c -o tiny_pool.o
+gcc -O3 -DNDEBUG -fPIC -shared tiny_pool.o -lpthread -o libtiny_pool.so
 ```
 
 ## Demo
@@ -70,16 +71,6 @@ gcc demo.c -L. -ltiny_pool -lpthread -o demo
 
 # dynamic library
 gcc demo.c -L. -ltiny_pool -o demo
-```
-
-In C++, the C ABI interface can be called directly. We can also repackage will OOP, which provides stronger functions under C++11, file at `demo.cc`:
-
-```bash
-# static library
-g++ demo.cc -L. -ltiny_pool -lpthread -o demo
-
-# dynamic library
-g++ demo.cc -L. -ltiny_pool -o demo
 ```
 
 ## License
