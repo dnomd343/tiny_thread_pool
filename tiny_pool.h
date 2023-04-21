@@ -50,11 +50,12 @@ public:
     explicit TinyPool(uint32_t size) { pool_ = create_pool(size); }
 
     /// Start running the thread pool.
-    void boot() {
+    TinyPool& boot() {
         if (pool_ == nullptr) {
             throw TinyPoolException("tiny thread pull already destroyed");
         }
         tiny_pool_boot(pool_);
+	return *this;
     }
 
     /// Join all threads.
